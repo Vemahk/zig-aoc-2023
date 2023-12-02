@@ -4,6 +4,14 @@ const RGB = struct {
     r: u8 = 0,
     g: u8 = 0,
     b: u8 = 0,
+
+    pub fn power(self: RGB) u32 {
+        var pwr: u32 = 1;
+        pwr *= self.r;
+        pwr *= self.g;
+        pwr *= self.b;
+        return pwr;
+    }
 };
 
 pub fn main() !void {
@@ -13,9 +21,8 @@ pub fn main() !void {
     const contents = try cwd.readFileAlloc(a, "inputs/day-two.txt", 1 << 20);
     defer a.free(contents);
 
-    var game_sum: usize = 0;
+    var minset_power_sum: u32 = 0;
 
-    const max = RGB{ .r = 12, .g = 13, .b = 14 };
     const preamble = "Game ";
     var line_iter = std.mem.tokenizeAny(u8, contents, "\n\r");
     while (line_iter.next()) |l| {
@@ -23,30 +30,25 @@ pub fn main() !void {
         const line = l[preamble.len..];
         var game_iter = std.mem.splitSequence(u8, line, ": ");
         const game_num = try std.fmt.parseInt(usize, game_iter.next() orelse unreachable, 10);
+        _ = game_num;
         const game_contents = game_iter.next() orelse unreachable;
 
-        var are_all_sets_possible = true;
+        var min_set = RGB{};
+
         var set_iter = std.mem.splitSequence(u8, game_contents, "; ");
+
         while (set_iter.next()) |set_str| {
             const set = try parseRGB(set_str);
-            if (!isSetPossible(set, max)) {
-                are_all_sets_possible = false;
-                break;
-            }
+            if (set.r > min_set.r) min_set.r = set.r;
+            if (set.g > min_set.g) min_set.g = set.g;
+            if (set.b > min_set.b) min_set.b = set.b;
         }
 
-        if (are_all_sets_possible) {
-            game_sum += game_num;
-        }
-
-        std.debug.print("Game {d}: {s}\n", .{ game_num, game_contents });
+        minset_power_sum += min_set.power();
+        // std.debug.print("Game {d}: {s}\n", .{ game_num, game_contents });
     }
 
-    std.log.info("Game sum: {d}", .{game_sum});
-}
-
-fn isSetPossible(set: RGB, max: RGB) bool {
-    return set.r <= max.r and set.g <= max.g and set.b <= max.b;
+    std.log.info("Min-set Power Sum: {d}", .{minset_power_sum});
 }
 
 fn parseRGB(set: []const u8) !RGB {
