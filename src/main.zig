@@ -10,6 +10,10 @@ const Coord = struct {
     r: usize,
     c: usize,
 
+    pub fn eq(a: Coord, b: Coord) bool {
+        return a.r == b.r and a.c == b.c;
+    }
+
     pub fn step(coord: Coord, dir: Dir) ?Coord {
         var newcoord = coord;
 
@@ -46,11 +50,41 @@ const Coord = struct {
 
         return row[coord.c];
     }
-};
 
-const Part = struct {
-    loc: Coord,
-    len: usize,
+    pub fn gearAt(coord: Coord, board: Board) !?usize {
+        const ch = coord.of(board) orelse return null;
+        if (ch != '*') return null;
+
+        var parts: [Dirs.len]Coord = undefined;
+        var parts_len: usize = 0;
+
+        var sum: usize = 1;
+        for (Dirs) |dir| {
+            var next_coord = coord.step(dir) orelse continue;
+            const next_ch = next_coord.of(board) orelse continue;
+            if (!isDigit(next_ch)) continue;
+
+            while (next_coord.step(Dir.Left)) |tmp| {
+                const tmp_ch = tmp.of(board) orelse break;
+                if (!isDigit(tmp_ch)) break;
+                next_coord = tmp;
+            }
+
+            if (for (parts[0..parts_len]) |part| {
+                if (next_coord.eq(part))
+                    break true;
+            } else false) {
+                continue;
+            }
+
+            const part = partAt(board, next_coord) orelse return null;
+            sum *= try std.fmt.parseInt(usize, part, 10);
+            parts[parts_len] = next_coord;
+            parts_len += 1;
+        }
+        if (parts_len != 2) return null;
+        return sum;
+    }
 };
 
 pub fn main() !void {
@@ -71,24 +105,32 @@ pub fn main() !void {
     var part_sum: usize = 0;
     for (matrix.items, 0..) |row, r| {
         for (row, 0..) |ch, c| {
-            if (!isDigit(ch))
-                continue;
-            if (c > 0 and isDigit(row[c - 1]))
+            if (ch != '*')
                 continue;
 
             const loc = Coord{ .r = r, .c = c };
-            const part = partAt(matrix, loc) orelse continue;
-            const part_num = try std.fmt.parseInt(usize, part, 10);
-            part_sum += part_num;
+            if (try loc.gearAt(matrix)) |gear_ratio| {
+                part_sum += gear_ratio;
+            }
         }
     }
     std.log.info("{d}", .{part_sum});
 }
 
 fn partAt(mat: Board, loc: Coord) ?[]const u8 {
-    var hasNearbySymbol = symbolSurrounds(mat, loc);
+    const ch = loc.of(mat) orelse return null;
+    if (!isDigit(ch))
+        return null;
 
     var next = loc;
+    while (next.step(Dir.Left)) |next_loc| {
+        const next_ch = next_loc.of(mat) orelse break;
+        if (!isDigit(next_ch))
+            break;
+        next = next_loc;
+    }
+
+    var hasNearbySymbol = symbolSurrounds(mat, loc);
     var len: usize = 1;
     while (next.step(Dir.Right)) |next_loc| {
         if (next_loc.of(mat)) |next_ch| {
